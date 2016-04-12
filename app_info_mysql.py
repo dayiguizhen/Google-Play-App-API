@@ -4,8 +4,14 @@ import MySQLdb
 import httplib
 import urlparse
 from bs4 import BeautifulSoup
+import datetime
 
-cookie_str = 'my cookie str';
+today = str(datetime.date.today());
+database = today + '_google_app';
+database = database.replace('-','_');
+
+
+cookie_str = 'you cookie str';
 
 def request(url,cookie=''):
     ret = urlparse.urlparse(url);
@@ -36,6 +42,7 @@ def get_package_info(packagename):
         return app_data;
     else:
         web = web.read();
+        #data = BeautifulSoup(web,'html5lib');
         data = BeautifulSoup(web,"html.parser");
         print packagename;
         
@@ -44,8 +51,17 @@ def get_package_info(packagename):
         app_developer = data.find('span',{'itemprop': 'name'}).string;
         app_developer = app_developer.encode('utf-8');
         app_category = data.find('span',{'itemprop': 'genre'}).string;
-        app_rate = data.find('span',{'class':'reviewers-small'}).get('aria-label');
-        app_score = data.find('div',{'class': 'score'}).string;
+        app_category = app_category.encode('utf-8')
+        #获取App的应用评价数
+        if data.find('span',{'class':'reviewers-small'}) is not None:
+            app_rate = data.find('span',{'class':'reviewers-small'}).get('aria-label');
+        else:
+            app_rate = 0;
+        #获取App的应用评分
+        if data.find('div',{'class': 'score'}) is not None:
+            app_score = data.find('div',{'class': 'score'}).string;
+        else:
+            app_score = None;
         app_description = data.find('div',{'jsname': 'C4s9Ed'}).get_text();
         app_description = app_description.encode('utf-8');
         app_datepublish = data.find('div',{'itemprop': 'datePublished'}).string;
@@ -90,9 +106,10 @@ def get_package_info(packagename):
             'packagename': packagename,
             }
         
+        #print app_data;
         return app_data;
 
-conn = MySQLdb.connect(host='127.0.0.1',user='root',passwd='123456',db='google_app',charset='utf8');
+conn = MySQLdb.connect(host='127.0.0.1',user='root',passwd='123456',db=database,charset='utf8');
 cursor = conn.cursor();
 
 def mysql_insert(packagename):
@@ -105,6 +122,7 @@ def mysql_insert(packagename):
 
 def mysql_select(packagename):
     select_sql = "SELECT * FROM app_info WHERE packagename = '%s'" %(packagename);
+    print select_sql;
     flag = cursor.execute(select_sql);
     results = cursor.fetchall();
     return flag;
@@ -119,15 +137,29 @@ def mysql_update(packagename):
     cursor.execute(update_sql,myDict.values());
     conn.commit();
 
+def mysql_get_name(category):
+    select_sql = "SELECT packagename FROM " + category + ";";
+    flag = cursor.execute(select_sql);
+    results = cursor.fetchall();
+    meta_list = [];
+    for row in results:
+        meta_list.append(row[0]);
+    return meta_list;
 
 
-f = open('packagename.txt').read();
-package_list = f.split('\r\n');
+category_list = ['BOOKS_AND_REFERENCE','BUSINESS','COMICS','COMMUNICATION','EDUCATION','ENTERTAINMENT','FINANCE','HEALTH_AND_FITNESS','LIBRARIES_AND_DEMO','LIFESTYLE','APP_WALLPAPER','MEDIA_AND_VIDEO','MEDICAL','MUSIC_AND_AUDIO','NEWS_AND_MAGAZINES','PERSONALIZATION','PHOTOGRAPHY','PRODUCTIVITY','SHOPPING','SOCIAL','SPORTS','TOOLS','TRANSPORTATION','TRAVEL_AND_LOCAL','WEATHER'];
+package_list = [];
+
+for category in category_list:
+    meta_list = mysql_get_name(category);
+    package_list.extend(meta_list);
+
+print len(package_list);
 
 if __name__ == '__main__':
     for packagename in package_list:
         if mysql_select(packagename):
-            mysql_update(packagename);
+            continue;
+            #mysql_update(packagename);
         else:
             mysql_insert(packagename);
-        time.sleep(3);
