@@ -28,7 +28,7 @@ def get_package_info(packagename):
             app_data = {};
             return app_data;
     web = web.read();
-    data = BeautifulSoup(web,"html.parser");
+    data = BeautifulSoup(web,"html.parser",from_encoding="utf-8");
     app_name = data.find('div',{'class': 'id-app-title'}).string;
     app_name = app_name.encode('utf-8');
     if data.find('span',{'itemprop': 'name'}) is not None:
